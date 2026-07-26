@@ -1,0 +1,290 @@
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  ImageRun,
+  Table,
+  TableRow,
+  TableCell,
+  HeadingLevel,
+  AlignmentType,
+  ShadingType,
+  WidthType,
+  VerticalAlign,
+  BorderStyle,
+  LevelFormat,
+} from 'docx'
+import { downloadBlob } from './download.js'
+
+// Word has no automatic numbering for ordered lists the way it does for
+// bullets, so this defines an explicit numbering scheme (1., 2., 3. …,
+// re-indented per nesting depth) that paragraphs reference by name.
+const ORDERED_LIST_REFERENCE = 'ordered-list'
+const ORDERED_LIST_NUMBERING_CONFIG = {
+  reference: ORDERED_LIST_REFERENCE,
+  levels: [0, 1, 2, 3, 4].map((level) => ({
+    level,
+    format: LevelFormat.DECIMAL,
+    text: `%${level + 1}.`,
+    alignment: AlignmentType.LEFT,
+    style: {
+      paragraph: {
+        indent: { left: 720 * (level + 1), hanging: 360 },
+      },
+    },
+  })),
+}
+
+const HEADING_MAP = {
+  1: HeadingLevel.HEADING_1,
+  2: HeadingLevel.HEADING_2,
+  3: HeadingLevel.HEADING_3,
+}
+
+const ALIGN_MAP = {
+  left: AlignmentType.LEFT,
+  center: AlignmentType.CENTER,
+  right: AlignmentType.RIGHT,
+}
+
+const MAX_IMAGE_WIDTH = 600 // px, roughly the content width inside 1" margins on Letter
+
+function alignmentFor(node) {
+  return ALIGN_MAP[node.attrs?.textAlign] || AlignmentType.LEFT
+}
+
+function base64ToUint8Array(base64) {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+}
+
+// Normalizes every pasted/uploaded image to PNG bytes (regardless of its
+// original format) and reads its real pixel dimensions, scaling down
+// oversized images so they don't blow past the page margins in Word.
+async function prepareImage(src) {
+  const img = await loadImageElement(src)
+  let width = img.naturalWidth || 400
+  let height = img.naturalHeight || 300
+  if (width > MAX_IMAGE_WIDTH) {
+    height = Math.round((height * MAX_IMAGE_WIDTH) / width)
+    width = MAX_IMAGE_WIDTH
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+  const base64 = canvas.toDataURL('image/png').split(',')[1]
+  return { type: 'png', data: base64ToUint8Array(base64), width, height }
+}
+
+function collectImageSrcs(nodes = [], acc = new Set()) {
+  nodes.forEach((node) => {
+    if (node.type === 'image' && node.attrs?.src) acc.add(node.attrs.src)
+    if (node.content) collectImageSrcs(node.content, acc)
+  })
+  return acc
+}
+
+function buildTextRun(node) {
+  const marks = node.marks || []
+  const has = (name) => marks.some((m) => m.type === name)
+  const get = (name) => marks.find((m) => m.type === name)
+
+  const options = {
+    text: node.text || '',
+    bold: has('bold'),
+    italics: has('italic'),
+    strike: has('strike'),
+  }
+  if (has('underline')) options.underline = {}
+
+  const color = get('textStyle')?.attrs?.color
+  if (color) options.color = color.replace('#', '')
+
+  const highlightColor = get('highlight')?.attrs?.color
+  if (highlightColor) {
+    options.shading = { type: ShadingType.CLEAR, fill: highlightColor.replace('#', ''), color: 'auto' }
+  }
+
+  if (has('code')) {
+    options.font = 'Consolas'
+    options.shading = options.shading || { type: ShadingType.CLEAR, fill: 'F4F5F7', color: 'auto' }
+  }
+
+  return new TextRun(options)
+}
+
+function buildInlineChildren(node) {
+  const children = (node.content || [])
+    .map((child) => {
+      if (child.type === 'text') return buildTextRun(child)
+      if (child.type === 'hardBreak') return new TextRun({ text: '', break: 1 })
+      return null
+    })
+    .filter(Boolean)
+  return children.length ? children : [new TextRun('')]
+}
+
+function buildParagraph(node, extra = {}) {
+  const options = { children: buildInlineChildren(node), alignment: alignmentFor(node), ...extra }
+  if (node.type === 'heading') options.heading = HEADING_MAP[node.attrs?.level] || HeadingLevel.HEADING_1
+  return new Paragraph(options)
+}
+
+function buildListParagraphs(listNode, ordered, depth) {
+  const paragraphs = []
+  ;(listNode.content || []).forEach((item) => {
+    ;(item.content || []).forEach((child) => {
+      if (child.type === 'bulletList') {
+        paragraphs.push(...buildListParagraphs(child, false, depth + 1))
+      } else if (child.type === 'orderedList') {
+        paragraphs.push(...buildListParagraphs(child, true, depth + 1))
+      } else if (child.type === 'paragraph') {
+        const extra = ordered
+          ? { numbering: { reference: ORDERED_LIST_REFERENCE, level: depth } }
+          : { bullet: { level: depth } }
+        paragraphs.push(buildParagraph(child, extra))
+      } else {
+        paragraphs.push(...buildBlocks([child], null))
+      }
+    })
+  })
+  return paragraphs
+}
+
+function buildTable(node, imageMap) {
+  const rows = (node.content || []).map((rowNode) => {
+    const cells = (rowNode.content || []).map((cellNode) => {
+      const isHeader = cellNode.type === 'tableHeader'
+      const cellChildren = cellNode.content?.length ? buildBlocks(cellNode.content, imageMap) : [new Paragraph('')]
+      return new TableCell({
+        children: cellChildren,
+        shading: isHeader ? { type: ShadingType.CLEAR, fill: 'F4F5F7', color: 'auto' } : undefined,
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 80, bottom: 80, left: 120, right: 120 },
+      })
+    })
+    return new TableRow({ children: cells })
+  })
+  return new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } })
+}
+
+function buildBlocks(nodes = [], imageMap) {
+  const out = []
+  nodes.forEach((node) => {
+    switch (node.type) {
+      case 'paragraph':
+      case 'heading':
+        out.push(buildParagraph(node))
+        break
+      case 'bulletList':
+        out.push(...buildListParagraphs(node, false, 0))
+        break
+      case 'orderedList':
+        out.push(...buildListParagraphs(node, true, 0))
+        break
+      case 'image': {
+        const prepared = imageMap?.get(node.attrs?.src)
+        if (prepared) {
+          out.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new ImageRun({
+                  type: prepared.type,
+                  data: prepared.data,
+                  transformation: { width: prepared.width, height: prepared.height },
+                }),
+              ],
+            }),
+          )
+        }
+        break
+      }
+      case 'table':
+        out.push(buildTable(node, imageMap))
+        out.push(new Paragraph(''))
+        break
+      case 'blockquote':
+        ;(node.content || []).forEach((child) => {
+          if (child.type === 'paragraph') {
+            out.push(
+              buildParagraph(child, {
+                indent: { left: 720 },
+                border: { left: { color: 'C7CDD6', space: 8, style: BorderStyle.SINGLE, size: 12 } },
+              }),
+            )
+          } else {
+            out.push(...buildBlocks([child], imageMap))
+          }
+        })
+        break
+      case 'codeBlock': {
+        const code = (node.content || []).map((t) => t.text).join('')
+        out.push(
+          new Paragraph({
+            children: [new TextRun({ text: code, font: 'Consolas' })],
+            shading: { type: ShadingType.CLEAR, fill: 'F4F5F7', color: 'auto' },
+          }),
+        )
+        break
+      }
+      case 'horizontalRule':
+        out.push(
+          new Paragraph({
+            border: { bottom: { color: 'C7CDD6', space: 1, style: BorderStyle.SINGLE, size: 6 } },
+          }),
+        )
+        break
+      default:
+        break
+    }
+  })
+  return out
+}
+
+export async function exportDocx(editor, filename) {
+  const json = editor.getJSON()
+  const srcs = Array.from(collectImageSrcs(json.content))
+  const preparedList = await Promise.all(srcs.map(prepareImage))
+  const imageMap = new Map(srcs.map((src, i) => [src, preparedList[i]]))
+
+  const children = buildBlocks(json.content, imageMap)
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            size: { width: 12240, height: 15840 }, // 8.5in x 11in, in twips
+            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
+          },
+        },
+        children: children.length ? children : [new Paragraph('')],
+      },
+    ],
+    styles: {
+      default: {
+        document: { run: { font: 'Calibri', size: 24 } },
+      },
+    },
+    numbering: {
+      config: [ORDERED_LIST_NUMBERING_CONFIG],
+    },
+  })
+
+  const blob = await Packer.toBlob(doc)
+  downloadBlob(blob, `${filename}.docx`)
+}

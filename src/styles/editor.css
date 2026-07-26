@@ -1,0 +1,165 @@
+/* ============================================================
+   Styling for the ProseMirror-managed contenteditable element.
+   This is the single source of truth for how the document looks,
+   which is why the HTML/PDF exports lean on these same rules.
+   ============================================================ */
+
+.editor-content {
+  font-family: var(--font-doc);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--ink);
+  outline: none;
+  min-height: 700px;
+}
+
+.editor-content > * + * {
+  margin-top: 0.85em;
+}
+
+.editor-content p {
+  margin: 0.85em 0;
+}
+
+.editor-content h1,
+.editor-content h2,
+.editor-content h3 {
+  font-family: var(--font-doc);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.4em 0 0.5em;
+}
+
+.editor-content h1 {
+  font-size: 2em;
+}
+.editor-content h2 {
+  font-size: 1.5em;
+}
+.editor-content h3 {
+  font-size: 1.2em;
+}
+
+.editor-content ul,
+.editor-content ol {
+  padding-left: 1.4em;
+  margin: 0.85em 0;
+}
+
+.editor-content li {
+  margin: 0.25em 0;
+}
+
+.editor-content li p {
+  margin: 0;
+}
+
+.editor-content blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--border-strong);
+  color: var(--ink-secondary);
+}
+
+.editor-content code {
+  background: var(--surface-sunken);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-family: 'Source Code Pro', Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.editor-content pre {
+  background: var(--surface-sunken);
+  padding: 12px 14px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.editor-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.editor-content hr {
+  border: none;
+  border-top: 1px solid var(--border-strong);
+  margin: 1.5em 0;
+}
+
+.editor-content img.editor-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+  border-radius: 4px;
+  break-inside: avoid;
+}
+
+.editor-content img.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.editor-content mark {
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Placeholder text shown on the empty document */
+.editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--ink-faint);
+  pointer-events: none;
+  height: 0;
+}
+
+/* ---------- Tables ---------- */
+.editor-content .tableWrapper {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.editor-content table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  break-inside: avoid;
+}
+
+.editor-content td,
+.editor-content th {
+  border: 1px solid var(--border-strong);
+  padding: 6px 10px;
+  vertical-align: top;
+  text-align: left;
+  position: relative;
+}
+
+.editor-content th {
+  background: var(--surface-sunken);
+  font-weight: 600;
+}
+
+.editor-content .selectedCell:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(47, 95, 219, 0.12);
+  pointer-events: none;
+}
+
+.editor-content .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.editor-content.resize-cursor {
+  cursor: col-resize;
+}

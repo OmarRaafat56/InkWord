@@ -1,0 +1,69 @@
+/* ============================================================
+   Design tokens
+   A precision writing tool: cool graphite canvas, a single
+   ink-blue accent, sans UI chrome around a serif "paper".
+   ============================================================ */
+:root {
+  --canvas: #e9ebef;
+  --surface: #ffffff;
+  --surface-sunken: #f4f5f7;
+  --border: #dde1e7;
+  --border-strong: #c7cdd6;
+
+  --ink: #14171f;
+  --ink-secondary: #5b616e;
+  --ink-faint: #9aa0ab;
+
+  --accent: #2f5fdb;
+  --accent-hover: #24439e;
+  --accent-soft: #e8edfc;
+  --accent-soft-border: #c4d3f8;
+
+  --danger: #c13f3f;
+  --danger-soft: #fbeaea;
+
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-doc: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-page: 0 1px 2px rgba(20, 23, 31, 0.04), 0 12px 32px rgba(20, 23, 31, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Visible keyboard focus everywhere, no exceptions */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
