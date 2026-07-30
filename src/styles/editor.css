@@ -8,7 +8,7 @@
   font-family: var(--font-doc);
   font-size: 16px;
   line-height: 1.65;
-  color: var(--ink);
+  color: var(--paper-ink);
   outline: none;
   min-height: 700px;
 }
@@ -57,12 +57,12 @@
 .editor-content blockquote {
   margin: 1em 0;
   padding-left: 1em;
-  border-left: 3px solid var(--border-strong);
-  color: var(--ink-secondary);
+  border-left: 3px solid var(--paper-border);
+  color: var(--paper-ink-secondary);
 }
 
 .editor-content code {
-  background: var(--surface-sunken);
+  background: var(--paper-sunken);
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-family: 'Source Code Pro', Consolas, monospace;
@@ -70,7 +70,7 @@
 }
 
 .editor-content pre {
-  background: var(--surface-sunken);
+  background: var(--paper-sunken);
   padding: 12px 14px;
   border-radius: 8px;
   overflow-x: auto;
@@ -83,7 +83,7 @@
 
 .editor-content hr {
   border: none;
-  border-top: 1px solid var(--border-strong);
+  border-top: 1px solid var(--paper-border);
   margin: 1.5em 0;
 }
 
@@ -91,14 +91,41 @@
   max-width: 100%;
   height: auto;
   display: block;
-  margin: 1em auto;
   border-radius: 4px;
   break-inside: avoid;
 }
 
-.editor-content img.ProseMirror-selectednode {
+.editor-content .resizable-image {
+  position: relative;
+  display: table; /* shrink-wraps to the image's natural size, unlike fit-content */
+  max-width: 100%;
+  line-height: 0;
+  margin: 1em auto;
+}
+
+.editor-content .resizable-image.is-selected .editor-image {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.editor-content .image-resize-handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--paper);
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  touch-action: none;
+}
+
+.editor-content .resizable-image:hover .image-resize-handle,
+.editor-content .resizable-image.is-selected .image-resize-handle {
+  opacity: 1;
 }
 
 .editor-content mark {
@@ -110,7 +137,7 @@
 .editor-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--ink-faint);
+  color: var(--paper-ink-faint);
   pointer-events: none;
   height: 0;
 }
@@ -124,13 +151,12 @@
 .editor-content table {
   border-collapse: collapse;
   table-layout: fixed;
-  width: 100%;
   break-inside: avoid;
 }
 
 .editor-content td,
 .editor-content th {
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--paper-border);
   padding: 6px 10px;
   vertical-align: top;
   text-align: left;
@@ -138,7 +164,7 @@
 }
 
 .editor-content th {
-  background: var(--surface-sunken);
+  background: var(--paper-sunken);
   font-weight: 600;
 }
 

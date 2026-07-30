@@ -8,6 +8,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  AlignJustify,
   ImagePlus,
   Table as TableIcon,
   Undo2,
@@ -27,6 +28,25 @@ const HEADING_OPTIONS = [
   { value: '2', label: 'Heading 2' },
   { value: '3', label: 'Heading 3' },
 ]
+
+const FONT_FAMILY_OPTIONS = [
+  { value: 'default', label: 'Default', family: null },
+  { value: 'serif', label: 'Source Serif', family: '"Source Serif 4", Georgia, serif' },
+  { value: 'sans', label: 'Inter', family: 'Inter, system-ui, sans-serif' },
+  { value: 'arial', label: 'Arial', family: 'Arial, Helvetica, sans-serif' },
+  { value: 'times', label: 'Times New Roman', family: '"Times New Roman", Times, serif' },
+  { value: 'georgia', label: 'Georgia', family: 'Georgia, serif' },
+  { value: 'courier', label: 'Courier New', family: '"Courier New", Courier, monospace' },
+  { value: 'trebuchet', label: 'Trebuchet MS', family: '"Trebuchet MS", sans-serif' },
+]
+
+const FONT_SIZE_OPTIONS = ['10', '11', '12', '14', '16', '18', '20', '24', '28', '32', '36', '48']
+
+function currentFontFamilyValue(editor) {
+  const active = editor.getAttributes('textStyle').fontFamily
+  const match = FONT_FAMILY_OPTIONS.find((opt) => opt.family === active)
+  return match ? match.value : 'default'
+}
 
 function currentHeadingValue(editor) {
   for (const level of [1, 2, 3]) {
@@ -50,6 +70,25 @@ export default function Toolbar({ editor }) {
   }
 
   const handleImagePick = () => fileInputRef.current?.click()
+
+  const handleFontFamilyChange = (event) => {
+    const value = event.target.value
+    const option = FONT_FAMILY_OPTIONS.find((opt) => opt.value === value)
+    if (!option || !option.family) {
+      editor.chain().focus().unsetFontFamily().run()
+    } else {
+      editor.chain().focus().setFontFamily(option.family).run()
+    }
+  }
+
+  const handleFontSizeChange = (event) => {
+    const value = event.target.value
+    if (value === 'default') {
+      editor.chain().focus().unsetFontSize().run()
+    } else {
+      editor.chain().focus().setFontSize(`${value}px`).run()
+    }
+  }
 
   const handleImageFile = (event) => {
     const file = event.target.files?.[0]
@@ -91,6 +130,31 @@ export default function Toolbar({ editor }) {
           {HEADING_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="heading-select"
+          value={currentFontFamilyValue(editor)}
+          onChange={handleFontFamilyChange}
+          aria-label="Font family"
+        >
+          {FONT_FAMILY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="heading-select font-size-select"
+          value={editor.getAttributes('textStyle').fontSize?.replace('px', '') || 'default'}
+          onChange={handleFontSizeChange}
+          aria-label="Font size"
+        >
+          <option value="default">Size</option>
+          {FONT_SIZE_OPTIONS.map((size) => (
+            <option key={size} value={size}>
+              {size}
             </option>
           ))}
         </select>
@@ -183,6 +247,13 @@ export default function Toolbar({ editor }) {
           onClick={() => editor.chain().focus().setTextAlign('right').run()}
         >
           <AlignRight size={17} />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Justify"
+          active={editor.isActive({ textAlign: 'justify' })}
+          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+        >
+          <AlignJustify size={17} />
         </ToolbarButton>
       </div>
 

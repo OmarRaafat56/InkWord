@@ -16,6 +16,7 @@ import {
   LevelFormat,
 } from 'docx'
 import { downloadBlob } from './download.js'
+import { imageKey, buildImageMap } from './imagePrep.js'
 
 // Word has no automatic numbering for ordered lists the way it does for
 // bullets, so this defines an explicit numbering scheme (1., 2., 3. …,
@@ -48,8 +49,6 @@ const ALIGN_MAP = {
   right: AlignmentType.RIGHT,
 }
 
-const MAX_IMAGE_WIDTH = 600 // px, roughly the content width inside 1" margins on Letter
-
 function alignmentFor(node) {
   return ALIGN_MAP[node.attrs?.textAlign] || AlignmentType.LEFT
 }
@@ -59,42 +58,6 @@ function base64ToUint8Array(base64) {
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return bytes
-}
-
-function loadImageElement(src) {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = src
-  })
-}
-
-// Normalizes every pasted/uploaded image to PNG bytes (regardless of its
-// original format) and reads its real pixel dimensions, scaling down
-// oversized images so they don't blow past the page margins in Word.
-async function prepareImage(src) {
-  const img = await loadImageElement(src)
-  let width = img.naturalWidth || 400
-  let height = img.naturalHeight || 300
-  if (width > MAX_IMAGE_WIDTH) {
-    height = Math.round((height * MAX_IMAGE_WIDTH) / width)
-    width = MAX_IMAGE_WIDTH
-  }
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-  const base64 = canvas.toDataURL('image/png').split(',')[1]
-  return { type: 'png', data: base64ToUint8Array(base64), width, height }
-}
-
-function collectImageSrcs(nodes = [], acc = new Set()) {
-  nodes.forEach((node) => {
-    if (node.type === 'image' && node.attrs?.src) acc.add(node.attrs.src)
-    if (node.content) collectImageSrcs(node.content, acc)
-  })
-  return acc
 }
 
 function buildTextRun(node) {
@@ -112,6 +75,15 @@ function buildTextRun(node) {
 
   const color = get('textStyle')?.attrs?.color
   if (color) options.color = color.replace('#', '')
+
+  const fontFamily = get('textStyle')?.attrs?.fontFamily
+  if (fontFamily) options.font = fontFamily.split(',')[0].replace(/["']/g, '').trim()
+
+  const fontSize = get('textStyle')?.attrs?.fontSize
+  if (fontSize) {
+    const px = parseFloat(fontSize)
+    if (Number.isFinite(px)) options.size = Math.round(px * 1.5) // px -> half-points (at 96dpi, 1px = 0.75pt)
+  }
 
   const highlightColor = get('highlight')?.attrs?.color
   if (highlightColor) {
@@ -196,15 +168,16 @@ function buildBlocks(nodes = [], imageMap) {
         out.push(...buildListParagraphs(node, true, 0))
         break
       case 'image': {
-        const prepared = imageMap?.get(node.attrs?.src)
+        const prepared = imageMap?.get(imageKey(node))
         if (prepared) {
+          const base64 = prepared.dataUrl.split(',')[1]
           out.push(
             new Paragraph({
               alignment: AlignmentType.CENTER,
               children: [
                 new ImageRun({
-                  type: prepared.type,
-                  data: prepared.data,
+                  type: 'png',
+                  data: base64ToUint8Array(base64),
                   transformation: { width: prepared.width, height: prepared.height },
                 }),
               ],
@@ -255,20 +228,25 @@ function buildBlocks(nodes = [], imageMap) {
   return out
 }
 
-export async function exportDocx(editor, filename) {
+// Standard page dimensions in twips (1440 twips = 1 inch).
+const PAGE_SIZES = {
+  letter: { width: 12240, height: 15840 }, // 8.5in x 11in
+  a4: { width: 11906, height: 16838 }, // 210mm x 297mm
+}
+
+export async function exportDocx(editor, filename, options = {}) {
   const json = editor.getJSON()
-  const srcs = Array.from(collectImageSrcs(json.content))
-  const preparedList = await Promise.all(srcs.map(prepareImage))
-  const imageMap = new Map(srcs.map((src, i) => [src, preparedList[i]]))
+  const imageMap = await buildImageMap(json.content)
 
   const children = buildBlocks(json.content, imageMap)
+  const pageSize = PAGE_SIZES[options.pageSize] || PAGE_SIZES.letter
 
   const doc = new Document({
     sections: [
       {
         properties: {
           page: {
-            size: { width: 12240, height: 15840 }, // 8.5in x 11in, in twips
+            size: pageSize,
             margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
           },
         },

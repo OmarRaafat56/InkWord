@@ -24,7 +24,13 @@ function renderMarks(text, marks = []) {
   if (has('underline')) result = `<u>${result}</u>`
 
   const color = get('textStyle')?.attrs?.color
-  if (color) result = `<span style="color:${color}">${result}</span>`
+  const fontFamily = get('textStyle')?.attrs?.fontFamily
+  const fontSize = get('textStyle')?.attrs?.fontSize
+  const styleParts = []
+  if (color) styleParts.push(`color:${color}`)
+  if (fontFamily) styleParts.push(`font-family:${fontFamily}`)
+  if (fontSize) styleParts.push(`font-size:${fontSize}`)
+  if (styleParts.length) result = `<span style="${styleParts.join(';')}">${result}</span>`
 
   const highlightColor = get('highlight')?.attrs?.color
   if (highlightColor) result = `<mark style="background-color:${highlightColor}">${result}</mark>`

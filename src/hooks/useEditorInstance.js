@@ -3,14 +3,18 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TextStyle from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
+import FontFamily from '@tiptap/extension-font-family'
 import Highlight from '@tiptap/extension-highlight'
 import TextAlign from '@tiptap/extension-text-align'
-import Image from '@tiptap/extension-image'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import Placeholder from '@tiptap/extension-placeholder'
+import { FontSize } from '../extensions/FontSize.js'
+import { ResizableImage } from '../extensions/ResizableImage.js'
+import { Pagination } from '../extensions/Pagination.js'
+import { TrailingNode } from '../extensions/TrailingNode.js'
 
 // Reads a File object (from a paste or drop event) into a base64 data URL.
 // Data URLs keep the whole document self-contained, which matters for the
@@ -39,12 +43,14 @@ export default function useEditorInstance() {
       Underline,
       TextStyle,
       Color,
+      FontFamily,
+      FontSize,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
-        alignments: ['left', 'center', 'right'],
+        alignments: ['left', 'center', 'right', 'justify'],
       }),
-      Image.configure({
+      ResizableImage.configure({
         inline: false,
         allowBase64: true,
         HTMLAttributes: { class: 'editor-image' },
@@ -54,6 +60,8 @@ export default function useEditorInstance() {
       TableHeader,
       TableCell,
       Placeholder.configure({ placeholder: 'Start writing…' }),
+      Pagination,
+      TrailingNode,
     ],
     content: STARTER_DOC,
     editorProps: {
